@@ -22,20 +22,11 @@ export const Header: React.FC<HeaderProps> = ({ userName, onLogout }) => {
     <header className="bg-white border-b border-surface-200 shadow-sm sticky top-0 z-40">
       <nav className="max-w-7xl mx-auto flex items-center justify-between h-16 px-4 md:px-6">
         {/* Logo — always left */}
-        <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-2.5 shrink-0">
           <SiteLogo className="w-10 h-10" />
-          <img
-            src="/amisync-name-light.svg?v=3"
-            alt="AmiSync"
-            className="h-6 w-auto hidden md:inline dark:md:hidden"
-            draggable={false}
-          />
-          <img
-            src="/amisync-name-dark.svg?v=3"
-            alt="AmiSync"
-            className="h-6 w-auto hidden dark:md:inline"
-            draggable={false}
-          />
+          <span className="text-xl font-extrabold tracking-tight text-surface-900 hidden md:inline">
+            AmiSync
+          </span>
         </Link>
 
         {/* Mobile menu button */}

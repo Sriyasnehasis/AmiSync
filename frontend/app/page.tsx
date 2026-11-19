@@ -200,20 +200,11 @@ export default function Home() {
       >
         <div className="flex justify-between items-center w-full">
           {/* Logo — always left */}
-          <Link href="/" className="group flex items-center gap-2 shrink-0">
-            <SiteLogo className="w-14 h-14" />
-            <img
-              src="/amisync-name-light.svg?v=3"
-              alt="AmiSync"
-              className="h-8 w-auto block dark:hidden"
-              draggable={false}
-            />
-            <img
-              src="/amisync-name-dark.svg?v=3"
-              alt="AmiSync"
-              className="h-8 w-auto hidden dark:block"
-              draggable={false}
-            />
+          <Link href="/" className="group flex items-center gap-2.5 shrink-0">
+            <SiteLogo className="w-10 h-10" />
+            <span className="text-xl font-extrabold tracking-tight text-text">
+              AmiSync
+            </span>
           </Link>
 
           {/* Desktop nav — centered */}
@@ -563,19 +554,10 @@ export default function Home() {
       >
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 px-6 md:px-10">
           <div className="flex items-center gap-3">
-            <SiteLogo className="w-10 h-10" />
-            <img
-              src="/amisync-name-light.svg?v=3"
-              alt="AmiSync"
-              className="h-6 w-auto opacity-70 block dark:hidden"
-              draggable={false}
-            />
-            <img
-              src="/amisync-name-dark.svg?v=3"
-              alt="AmiSync"
-              className="h-6 w-auto opacity-70 hidden dark:block"
-              draggable={false}
-            />
+            <SiteLogo className="w-9 h-9" />
+            <span className="text-lg font-extrabold tracking-tight text-text">
+              AmiSync
+            </span>
             <div className="text-sm font-bold tracking-wider text-text-muted uppercase">
               © 2026 — Empowering Your Career Journey
             </div>

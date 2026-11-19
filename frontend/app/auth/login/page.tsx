@@ -118,20 +118,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-bg flex items-center justify-center relative overflow-hidden px-4 font-sans text-text transition-colors duration-200">
       {/* 🧭 Top Bar containing logo and theme switcher */}
       <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-20 max-w-6xl mx-auto">
-        <Link href="/" className="group flex items-center gap-3">
-          <SiteLogo className="w-12 h-12" />
-          <img
-            src="/amisync-name-light.svg?v=3"
-            alt="AmiSync"
-            className="h-7 w-auto block dark:hidden"
-            draggable={false}
-          />
-          <img
-            src="/amisync-name-dark.svg?v=3"
-            alt="AmiSync"
-            className="h-7 w-auto hidden dark:block"
-            draggable={false}
-          />
+        <Link href="/" className="group flex items-center gap-2.5">
+          <SiteLogo className="w-10 h-10" />
+          <span className="text-xl font-extrabold tracking-tight text-text">
+            AmiSync
+          </span>
         </Link>
         <ThemeSwitcher />
       </div>
