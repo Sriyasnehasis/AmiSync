@@ -203,13 +203,13 @@ export default function Home() {
           <Link href="/" className="group flex items-center gap-2 shrink-0">
             <SiteLogo className="w-14 h-14" />
             <img
-              src="/amisync-name-light.svg?v=2"
+              src="/amisync-name-light.svg?v=3"
               alt="AmiSync"
               className="h-8 w-auto block dark:hidden"
               draggable={false}
             />
             <img
-              src="/amisync-name-dark.svg?v=2"
+              src="/amisync-name-dark.svg?v=3"
               alt="AmiSync"
               className="h-8 w-auto hidden dark:block"
               draggable={false}
@@ -565,13 +565,13 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <SiteLogo className="w-10 h-10" />
             <img
-              src="/amisync-name-light.svg?v=2"
+              src="/amisync-name-light.svg?v=3"
               alt="AmiSync"
               className="h-6 w-auto opacity-70 block dark:hidden"
               draggable={false}
             />
             <img
-              src="/amisync-name-dark.svg?v=2"
+              src="/amisync-name-dark.svg?v=3"
               alt="AmiSync"
               className="h-6 w-auto opacity-70 hidden dark:block"
               draggable={false}

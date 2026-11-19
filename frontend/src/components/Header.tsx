@@ -25,13 +25,13 @@ export const Header: React.FC<HeaderProps> = ({ userName, onLogout }) => {
         <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
           <SiteLogo className="w-10 h-10" />
           <img
-            src="/amisync-name-light.svg?v=2"
+            src="/amisync-name-light.svg?v=3"
             alt="AmiSync"
             className="h-6 w-auto hidden md:inline dark:md:hidden"
             draggable={false}
           />
           <img
-            src="/amisync-name-dark.svg?v=2"
+            src="/amisync-name-dark.svg?v=3"
             alt="AmiSync"
             className="h-6 w-auto hidden dark:md:inline"
             draggable={false}

@@ -175,13 +175,13 @@ export default function DashboardLayout({
         <Link href="/" className="flex items-center gap-2.5 group">
           <SiteLogo className="w-12 h-12" />
           <img
-            src="/amisync-name-light.svg?v=2"
+            src="/amisync-name-light.svg?v=3"
             alt="AmiSync"
             className="h-7 w-auto block dark:hidden"
             draggable={false}
           />
           <img
-            src="/amisync-name-dark.svg?v=2"
+            src="/amisync-name-dark.svg?v=3"
             alt="AmiSync"
             className="h-7 w-auto hidden dark:block"
             draggable={false}
