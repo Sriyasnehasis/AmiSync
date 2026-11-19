@@ -32,8 +32,10 @@ export default function TemplateSelection({
   const fetchTemplates = async () => {
     try {
       setLoading(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiBase = apiUrl.endsWith("/api/v1") ? apiUrl : `${apiUrl}/api/v1`;
       const response = await fetch(
-        "http://localhost:8000/api/v1/resumes/templates",
+        `${apiBase}/resumes/templates`,
       );
       const data = await response.json();
       setTemplates(data.templates);

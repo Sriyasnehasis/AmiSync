@@ -192,8 +192,10 @@ export default function ResumeBuilderForm({
         ...formData,
       };
 
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiBase = apiUrl.endsWith("/api/v1") ? apiUrl : `${apiUrl}/api/v1`;
       const response = await fetch(
-        "http://localhost:8000/api/v1/resumes/create",
+        `${apiBase}/resumes/create`,
         {
           method: "POST",
           headers: {

@@ -58,8 +58,10 @@ export default function ResumeEditor({ resumeId, onSave }: ResumeEditorProps) {
   const fetchResume = async () => {
     try {
       const token = localStorage.getItem("token");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiBase = apiUrl.endsWith("/api/v1") ? apiUrl : `${apiUrl}/api/v1`;
       const response = await fetch(
-        `http://localhost:8000/api/v1/resumes/${resumeId}/preview`,
+        `${apiBase}/resumes/${resumeId}/preview`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -104,8 +106,10 @@ export default function ResumeEditor({ resumeId, onSave }: ResumeEditorProps) {
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiBase = apiUrl.endsWith("/api/v1") ? apiUrl : `${apiUrl}/api/v1`;
       const response = await fetch(
-        `http://localhost:8000/api/v1/resumes/${resumeId}`,
+        `${apiBase}/resumes/${resumeId}`,
         {
           method: "PUT",
           headers: {

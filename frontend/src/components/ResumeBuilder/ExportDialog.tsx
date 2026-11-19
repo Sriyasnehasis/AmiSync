@@ -29,8 +29,10 @@ export default function ExportDialog({
         return;
       }
 
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiBase = apiUrl.endsWith("/api/v1") ? apiUrl : `${apiUrl}/api/v1`;
       const response = await fetch(
-        `http://localhost:8000/api/v1/resumes/${resumeId}/export/${format}`,
+        `${apiBase}/resumes/${resumeId}/export/${format}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
