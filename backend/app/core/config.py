@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     )
     
     # App Settings
-    APP_NAME: str = "ExtractResume AI"
+    APP_NAME: str = "AmiSync"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
     
