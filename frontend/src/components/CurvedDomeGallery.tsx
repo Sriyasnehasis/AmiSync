@@ -191,7 +191,7 @@ export function CurvedDomeGallery() {
                           />
                         ))}
                       </div>
-                      <p className="text-[9px] text-text-muted italic">"Concise response with clear metrics."</p>
+                      <p className="text-[9px] text-text-muted italic">&ldquo;Concise response with clear metrics.&rdquo;</p>
                     </div>
                   )}
 
@@ -215,7 +215,7 @@ export function CurvedDomeGallery() {
                         <span className="font-bold text-text">Sarah Jenkins • VP Talent</span>
                         <span className="text-[9px] font-black uppercase text-accent">Active Now</span>
                       </div>
-                      <p className="text-[9px] text-text-muted truncate">"Hi Sarah, noticed your team scaling the distributed..."</p>
+                      <p className="text-[9px] text-text-muted truncate">&ldquo;Hi Sarah, noticed your team scaling the distributed...&rdquo;</p>
                       <div className="w-full py-1 text-center bg-accent-soft rounded text-[9px] font-black text-accent uppercase tracking-wider">
                         Auto-Drafted Outreach
                       </div>
