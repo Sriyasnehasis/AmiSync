@@ -17,7 +17,7 @@ interface TextEffectProps {
   children: string;
   per?: Per;
   preset?: Preset;
-  as?: keyof JSX.IntrinsicElements;
+  as?: keyof React.JSX.IntrinsicElements;
   delay?: number;
   className?: string;
   stagger?: number;
