@@ -9,8 +9,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # PostgreSQL (Relational) - For structured User & Job data
-# Use NullPool to prevent connection caching issues between app restarts
-engine = create_engine(os.getenv("POSTGRES_URL"), poolclass=NullPool)
+# Supports both POSTGRES_URL and DATABASE_URL, and fixes postgres:// prefix for SQLAlchemy
+raw_db_url = os.getenv("POSTGRES_URL") or os.getenv("DATABASE_URL") or "sqlite:///./amisync_fallback.db"
+if raw_db_url.startswith("postgres://"):
+    raw_db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(raw_db_url, poolclass=NullPool)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
