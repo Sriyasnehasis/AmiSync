@@ -1,0 +1,371 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  Search,
+  MapPin,
+  Bookmark,
+  Target,
+  ArrowUpRight,
+  Filter,
+  Loader2,
+  ExternalLink,
+  RefreshCw,
+} from "lucide-react";
+
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = RAW_API_URL.endsWith("/api/v1")
+  ? RAW_API_URL
+  : `${RAW_API_URL}/api/v1`;
+
+interface Job {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  salary?: string;
+  type: string;
+  match?: number;
+  posted: string;
+  url?: string;
+  description?: string;
+}
+
+export default function JobsPage() {
+  const { token } = useAuth() as any;
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("Software Developer");
+  const [searchLocation, setSearchLocation] = useState("India");
+  const [savedJobs, setSavedJobs] = useState<string[]>([]);
+
+  const fetchApplications = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/applications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Set bookmarked job IDs (only pending status represents saved wishlist jobs)
+        const pendingIds = data
+          .filter((app: any) => app.status === "pending")
+          .map((app: any) => String(app.job_id));
+        setSavedJobs(pendingIds);
+      }
+    } catch (e) {
+      console.error("Error loading bookmarks:", e);
+    }
+  };
+
+  const fetchJobs = async (query?: string, location?: string) => {
+    setLoading(true);
+    const searchQ = query || searchQuery;
+    const searchL = location || searchLocation;
+
+    try {
+      // Sync latest live jobs from backend aggregator first.
+      await fetch(`${API_URL}/jobs/sync-live`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: searchQ,
+          location: searchL,
+          max_results: 25,
+        }),
+      });
+
+      // Fetch search results from backend.
+      const res = await fetch(
+        `${API_URL}/jobs/search?keyword=${encodeURIComponent(searchQ)}&location=${encodeURIComponent(searchL)}`,
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.jobs && data.jobs.length > 0) {
+          setJobs(
+            data.jobs.map((j: any) => ({
+              id: j.id || String(Math.random()),
+              title: j.title,
+              company: j.company?.display_name || j.company || "Unknown",
+              location: j.location?.display_name || j.location || "Remote",
+              salary:
+                j.salary_min && j.salary_max
+                  ? `₹${Math.round(j.salary_min / 100000)}L - ₹${Math.round(j.salary_max / 100000)}L`
+                  : j.salary || "",
+              type: j.contract_type || j.type || "Full-time",
+              posted: j.created
+                ? new Date(j.created).toLocaleDateString()
+                : "Recently",
+              url: j.redirect_url || j.url || "#",
+              description: j.description || "",
+            })),
+          );
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch jobs:", e);
+    }
+
+    // Final fallback
+    setJobs([]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchJobs();
+    fetchApplications();
+  }, [token]);
+
+  const handleSearch = () => {
+    fetchJobs(searchQuery, searchLocation);
+  };
+
+  const toggleSave = async (jobId: string) => {
+    if (!token) {
+      alert("Please log in to save jobs.");
+      return;
+    }
+    const isBookmarked = savedJobs.includes(jobId);
+    const targetStatus = isBookmarked ? "withdrawn" : "pending";
+    
+    try {
+      const res = await fetch(`${API_URL}/applications/apply`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          job_listing_id: Number(jobId),
+          status: targetStatus
+        })
+      });
+      if (res.ok) {
+        setSavedJobs((prev) =>
+          isBookmarked ? prev.filter((j) => j !== jobId) : [...prev, jobId],
+        );
+      } else {
+        const errData = await res.json();
+        let errMsg = "Failed to update bookmark status.";
+        if (typeof errData.detail === "string") {
+          errMsg = errData.detail;
+        } else if (Array.isArray(errData.detail)) {
+          errMsg = errData.detail.map((err: any) => err.msg).join("\n");
+        } else if (errData.detail && typeof errData.detail === "object") {
+          errMsg = JSON.stringify(errData.detail);
+        }
+
+        if (errMsg.toLowerCase().includes("resume")) {
+          alert("Please upload your resume in the Dashboard or Skills section before saving/applying to jobs!");
+        } else {
+          alert(errMsg);
+        }
+      }
+    } catch (err) {
+      console.error("Error toggling bookmark:", err);
+    }
+  };
+
+  const handleApply = async (jobId: string, jobUrl?: string) => {
+    if (!token) {
+      alert("Please log in to apply for jobs.");
+      return;
+    }
+    
+    try {
+      const res = await fetch(`${API_URL}/applications/apply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          job_listing_id: Number(jobId),
+          status: "applied"
+        })
+      });
+      
+      if (res.ok) {
+        alert("Application tracked in your pipeline! Opening job listing...");
+      } else {
+        const errData = await res.json();
+        let errMsg = "Failed to track application.";
+        if (typeof errData.detail === "string") {
+          errMsg = errData.detail;
+        } else if (Array.isArray(errData.detail)) {
+          errMsg = errData.detail.map((err: any) => err.msg).join("\n");
+        } else if (errData.detail && typeof errData.detail === "object") {
+          errMsg = JSON.stringify(errData.detail);
+        }
+
+        if (errMsg.toLowerCase().includes("resume")) {
+          alert("Please upload your resume in the Dashboard or Skills section before saving/applying to jobs!");
+          return;
+        } else {
+          alert(errMsg);
+        }
+      }
+    } catch (err) {
+      console.error("Error tracking application:", err);
+    }
+    
+    if (jobUrl && jobUrl !== "#") {
+      window.open(jobUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  return (
+    <DashboardLayout title="Jobs">
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="pb-6 border-b border-slate-100">
+          <h1 className="text-3xl font-extrabold text-slate-900 mb-1">Job Board</h1>
+          <p className="text-slate-500 text-base">
+            Live job listings synced from Adzuna and institutional partners.
+          </p>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              size={18}
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="Search by title, stack, or company..."
+              className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm"
+            />
+          </div>
+          <div className="relative">
+            <MapPin
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              size={18}
+            />
+            <input
+              type="text"
+              value={searchLocation}
+              onChange={(e) => setSearchLocation(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="Location..."
+              className="w-full md:w-48 pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            className="btn-primary px-8 py-3.5"
+          >
+            Search
+          </button>
+        </div>
+
+        {/* Results count */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-500 font-medium">
+              {jobs.length} jobs found
+            </p>
+            <button
+              onClick={() => fetchJobs()}
+              className="text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
+            >
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </div>
+        )}
+
+        {/* Job Listings */}
+        {loading ? (
+          <div className="glass-card p-16 flex flex-col items-center justify-center gap-4">
+            <Loader2 size={32} className="text-indigo-400 animate-spin" />
+            <p className="text-slate-400 font-medium">
+              Fetching live jobs from Adzuna...
+            </p>
+          </div>
+        ) : jobs.length === 0 ? (
+          <div className="glass-card p-16 text-center">
+            <p className="text-slate-400 text-lg mb-4">
+              No jobs found. Try different keywords.
+            </p>
+            <button
+              onClick={() => {
+                setSearchQuery("Developer");
+                fetchJobs("Developer");
+              }}
+              className="text-indigo-400 font-semibold hover:underline"
+            >
+              Search &quot;Developer&quot;
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {jobs.map((job) => (
+              <div
+                key={job.id}
+                className="glass-card p-6 md:p-8 group hover:border-indigo-500/20"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                  <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center font-bold text-lg text-indigo-600 group-hover:scale-110 transition-transform flex-shrink-0 shadow-sm">
+                    {job.company?.[0] || "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1 flex-wrap">
+                      <h3 className="text-lg font-bold text-white">
+                        {job.title}
+                      </h3>
+                      <span className="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase tracking-wider rounded-full">
+                        {job.type}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 font-medium flex items-center gap-2 text-sm flex-wrap">
+                      {job.company} • <MapPin size={14} /> {job.location}
+                      {job.salary && <> • {job.salary}</>}
+                    </p>
+                    {job.description && (
+                      <p className="text-slate-500 text-sm mt-2 line-clamp-2">
+                        {job.description.replace(/<[^>]+>/g, "").slice(0, 150)}
+                        ...
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs text-slate-500">{job.posted}</span>
+                    <button
+                      onClick={() => handleApply(job.id, job.url)}
+                      className="btn-gradient !rounded-xl !px-5 !py-3 text-sm whitespace-nowrap flex items-center gap-1.5"
+                    >
+                      Apply {job.url && job.url !== "#" ? <ExternalLink size={14} /> : <ArrowUpRight size={14} />}
+                    </button>
+                    <button
+                      onClick={() => toggleSave(job.id)}
+                      className={`p-3 rounded-xl transition-all border ${
+                        savedJobs.includes(job.id)
+                          ? "bg-indigo-500/20 border-indigo-500/30 text-indigo-400"
+                          : "bg-white/5 border-white/5 text-slate-500 hover:text-white"
+                      }`}
+                    >
+                      <Bookmark
+                        size={18}
+                        className={
+                          savedJobs.includes(job.id) ? "fill-current" : ""
+                        }
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}

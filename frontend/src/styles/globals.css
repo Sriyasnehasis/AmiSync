@@ -1,0 +1,256 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Spec Backgrounds */
+  --bg-page: #F8FAFC;        /* crisp slate-50 base */
+  --bg-surface: #FFFFFF;     /* clean pure white cards & raised panels */
+  --bg-surface-alt: #F1F5F9; /* slate-100 subtle secondary */
+
+  /* Spec Text */
+  --text-primary: #0F172A;   /* deep slate-900 headlines/body */
+  --text-secondary: #475569; /* slate-600 subtext/captions */
+
+  /* Spec Accent */
+  --accent: #5845FE;         /* electric indigo-violet (AmiSync logo primary) */
+  --accent-hover: #4532E8;   /* deeper indigo for hover/active states */
+  --accent-soft: #EEF2FF;    /* soft indigo-50 tint for badges, hover backgrounds */
+  --accent-2: #00D09C;       /* vibrant mint-teal (AmiSync logo secondary) */
+
+  /* Spec Borders */
+  --border: #E2E8F0;         /* slate-200 clean hairline borders */
+
+  /* Spec Semantic */
+  --success: #00D09C;        /* mint-teal */
+  --warning: #F59E0B;        /* amber */
+
+  /* Tailwind Aliases */
+  --bg: var(--bg-page);
+  --bg-raised: var(--bg-surface-alt);
+  --text: var(--text-primary);
+  --text-muted: var(--text-secondary);
+  --selection: rgba(88, 69, 254, 0.15);
+}
+
+.dark {
+  /* Spec Backgrounds */
+  --bg-page: #0B0F19;        /* deep midnight slate */
+  --bg-surface: #111827;     /* dark slate surface */
+  --bg-surface-alt: #1E293B; /* slate-800 secondary */
+
+  /* Spec Text */
+  --text-primary: #F8FAFC;   /* crisp white headlines/body */
+  --text-secondary: #94A3B8; /* muted slate grey, subtext */
+
+  /* Spec Accent */
+  --accent: #6C5CE7;         /* luminous electric violet */
+  --accent-hover: #7E71F3;   /* bright violet hover */
+  --accent-soft: rgba(108, 92, 231, 0.16); /* soft violet badge glow */
+  --accent-2: #00D09C;       /* vibrant mint-teal */
+
+  /* Spec Borders */
+  --border: #1E293B;         /* slate-800 subtle border */
+
+  /* Spec Semantic */
+  --success: #00D09C;
+  --warning: #FBBF24;
+
+  /* Tailwind Aliases */
+  --bg: var(--bg-page);
+  --bg-raised: var(--bg-surface-alt);
+  --text: var(--text-primary);
+  --text-muted: var(--text-secondary);
+  --selection: rgba(108, 92, 231, 0.25);
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    @apply antialiased transition-colors duration-200 ease-in-out;
+  }
+
+  ::selection {
+    background-color: var(--selection);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border);
+    @apply rounded-2xl shadow-sm transition-all duration-300;
+  }
+
+  .glass-card:hover {
+    @apply shadow-md -translate-y-1;
+    border-color: var(--accent);
+  }
+
+  .btn-premium {
+    background-color: var(--accent);
+    color: var(--bg-surface);
+    @apply px-6 py-3 rounded-full font-bold transition-all duration-300 flex items-center justify-center gap-2;
+  }
+
+  .btn-premium:hover {
+    @apply filter brightness-110 -translate-y-0.5 shadow-lg;
+  }
+
+  .input-premium {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    @apply w-full px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition-all;
+  }
+
+  .outline-text {
+    @apply text-transparent;
+    -webkit-text-stroke: 1px var(--text-muted);
+    opacity: 0.3;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Typography Mixins */
+.font-display { font-family: var(--font-bricolage), system-ui, sans-serif; }
+.font-body { font-family: var(--font-dm-sans), system-ui, sans-serif; }
+.font-serif-italic { font-family: var(--font-lora), serif; font-style: italic; }
+.font-mono { font-family: var(--font-jetbrains-mono), monospace; }
+
+/* Custom animations for AI Optimized elements */
+@keyframes skill-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(88, 69, 254, 0.2), inset 0 0 4px rgba(88, 69, 254, 0.1);
+    border-color: rgba(88, 69, 254, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(88, 69, 254, 0.6), inset 0 0 8px rgba(88, 69, 254, 0.2);
+    border-color: rgba(88, 69, 254, 0.9);
+  }
+}
+
+@keyframes text-sparkle {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.skill-highlight-new {
+  animation: skill-glow 2.5s infinite ease-in-out;
+  background-color: var(--accent-soft);
+  border-color: var(--accent);
+  border-width: 1px;
+  color: var(--text-primary);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.sparkle-icon {
+  animation: text-sparkle 1.5s infinite ease-in-out;
+  color: var(--accent);
+}
+
+/* ─── Nav link hover underline ─────────────────────────────────────────────── */
+.nav-link {
+  position: relative;
+  display: inline-block;
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background-color: var(--accent);
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nav-link:hover::after {
+  width: 100%;
+}
+
+/* ─── CTA Button micro-lift ─────────────────────────────────────────────────── */
+.btn-lift {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-lift:hover {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
+}
+.btn-lift:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+
+/* ─── Feature card hover elevation ──────────────────────────────────────────── */
+.feature-card {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s ease,
+              box-shadow 0.3s ease;
+}
+.feature-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+}
+
+/* ─── Scroll-triggered reveal (JS-free fallback via @keyframes + IntersectionObserver) */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  opacity: 0;
+}
+.reveal.in-view {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Mobile nav drawer focus-trap scroll lock ───────────────────────────────── */
+body.nav-open {
+  overflow: hidden;
+}
+
+/* ─── Prevent CLS on nav pill ──────────────────────────────────────────────── */
+.nav-pill {
+  contain: layout style;
+  will-change: transform, opacity;
+}
+

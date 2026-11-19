@@ -1,0 +1,18 @@
+meta {
+  name: Upload Resume
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/jobs/analyze-resume
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "resume_text": "your resume text here",
+    "job_description": "target job description here"
+  }
+}
