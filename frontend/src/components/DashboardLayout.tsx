@@ -5,19 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard,
   FileText,
-  Sparkles,
-  TrendingUp,
-  Briefcase,
   Mic,
-  Users,
   LogOut,
   Menu,
   X,
-  User,
-  Settings,
-  Zap,
   Command as CommandIcon,
   Bell,
   Loader2,
@@ -27,26 +19,14 @@ import { CommandBar } from "@/components/CommandBar";
 import { FloatingActionRing } from "@/components/FloatingActionRing";
 import { SiteLogo } from "@/components/SiteLogo";
 
+// v1 scope: only Resume Optimizer and Mock Interview are exposed in the UI.
+// Other features are deferred per AmiSync_Revised_Plan_v2.md §5.
 const navSections = [
   {
-    title: "Core Ecosystem",
+    title: "Your Toolkit",
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      {
-        href: "/resume",
-        label: "Resume Builder",
-        icon: FileText,
-        badge: "NEW",
-      },
-      { href: "/interviews", label: "Mock Interview", icon: Mic },
-      { href: "/cover-letter", label: "Cover Letter", icon: Zap },
-      { href: "/tracker", label: "Tracker", icon: TrendingUp }
-    ],
-  },
-  {
-    title: "Optimization",
-    items: [
-      { href: "/skill-gap", label: "Skill Gap", icon: Sparkles },
+      { href: "/resume", label: "Resume Optimizer", icon: FileText },
+      { href: "/interviews", label: "Interview Prep", icon: Mic },
     ],
   },
 ];
@@ -209,11 +189,6 @@ export default function DashboardLayout({
                       }
                     />
                     <span className="text-sm">{item.label}</span>
-                    {item.badge && (
-                      <span className="ml-auto text-[8px] font-black bg-accent text-bg px-1.5 py-0.5 rounded uppercase tracking-tighter">
-                        {item.badge}
-                      </span>
-                    )}
                   </Link>
                 );
               })}

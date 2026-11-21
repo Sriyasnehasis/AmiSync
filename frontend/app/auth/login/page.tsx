@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-react";
 import { SiteLogo } from "@/components/SiteLogo";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { useAuthStore } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function LoginPage() {
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem("token", data.access_token);
+        useAuthStore.getState().setToken(data.access_token);
 
         const userRes = await fetch(`${apiBase}/users/me`, {
           headers: { Authorization: `Bearer ${data.access_token}` },
@@ -49,6 +51,7 @@ export default function LoginPage() {
         if (userRes.ok) {
           const userData = await userRes.json();
           localStorage.setItem("user", JSON.stringify(userData));
+          useAuthStore.getState().setUser(userData);
           if (!userData.profession) {
             router.push("/auth/onboarding");
           } else {

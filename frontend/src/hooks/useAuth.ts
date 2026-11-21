@@ -57,3 +57,33 @@ export const useAuth = () => {
 
   return { token, user, setToken, setUser, logout };
 };
+
+/**
+ * Always read the token from localStorage at call time. Login/signup write
+ * to localStorage first, so a page mounted later in the same SPA session can
+ * otherwise read a stale `null` token from the Zustand store.
+ * Use this for building Authorization headers in API calls.
+ */
+export const getStoredToken = (): string | null => {
+  if (
+    typeof window === "undefined" ||
+    typeof window.localStorage === "undefined"
+  ) {
+    return null;
+  }
+  return window.localStorage.getItem("token");
+};
+
+/** Re-sync the Zustand store from localStorage (e.g. after OAuth redirects). */
+export const syncAuthFromStorage = () => {
+  if (
+    typeof window === "undefined" ||
+    typeof window.localStorage === "undefined"
+  ) {
+    return;
+  }
+  useAuthStore.setState({
+    token: window.localStorage.getItem("token"),
+    user: JSON.parse(window.localStorage.getItem("user") || "null"),
+  });
+};

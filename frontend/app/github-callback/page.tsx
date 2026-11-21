@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { IconBrandGithub } from "@tabler/icons-react";
 import { motion } from "framer-motion";
+import { useAuthStore } from "@/hooks/useAuth";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -60,11 +61,13 @@ function GitHubCallbackContent() {
 
           if (response.ok && data.access_token) {
             localStorage.setItem("token", data.access_token);
+            useAuthStore.getState().setToken(data.access_token);
             if (data.refresh_token) {
               localStorage.setItem("refresh_token", data.refresh_token);
             }
             if (data.user) {
               localStorage.setItem("user", JSON.stringify(data.user));
+              useAuthStore.getState().setUser(data.user);
             }
 
             setStatus("success");

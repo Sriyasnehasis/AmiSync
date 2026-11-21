@@ -3,7 +3,11 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.db import get_db, raw_db
 from app.core.security import security_service
-from app.services.interview_service import mock_interview_service, InterviewRole
+from app.services.interview_service import (
+    mock_interview_service,
+    InterviewRole,
+    analyze_delivery_metrics,
+)
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/interviews", tags=["Live Video Interviews"])
@@ -12,7 +16,8 @@ router = APIRouter(prefix="/interviews", tags=["Live Video Interviews"])
 
 class StartInterviewRequest(BaseModel):
     role: str  # "senior_dev", "junior_dev", "devops", "data_scientist", "product_manager", "fullstack"
-    interview_type: str = "voice"  # "voice", "video", "text"
+    industry: str = ""  # free-form industry / field, e.g. "Healthcare", "FMCG"
+    interview_type: str = "voice"  # "voice" or "text"
 
 class SubmitAnswerRequest(BaseModel):
     question_id: int
@@ -53,6 +58,17 @@ async def get_available_roles():
         "count": len(roles),
         "message": "Available interview roles"
     }
+
+@router.get("/available-industries")
+async def get_available_industries():
+    """Common industries for the interview setup picker (free-form input is also accepted)."""
+    industries = [
+        "Technology", "Healthcare", "Finance", "Education", "Retail / FMCG",
+        "Manufacturing", "Media & Marketing", "Hospitality", "Logistics",
+        "Non-profit", "Government / Public Sector", "Other",
+    ]
+    return {"industries": industries, "count": len(industries)}
+
 
 @router.get("/past-sessions")
 async def get_past_sessions(
@@ -134,13 +150,16 @@ async def start_interview(
         print(f"[INTERVIEW] Starting interview for user {current_user_id}, role: {role}")
         
         # Start interview session
-        session_data = await mock_interview_service.start_interview_dynamic(current_user_id, role, db)
+        session_data = await mock_interview_service.start_interview_dynamic(
+            current_user_id, role, db, industry=(request.industry or "").strip() or None
+        )
         print(f"[INTERVIEW] Session created: {session_data['session_id']}")
         
         return {
             "status": "success",
             "session_id": session_data["session_id"],
             "role": session_data["role"],
+            "industry": session_data.get("industry"),
             "total_questions": session_data["total_questions"],
             "current_question": {
                 "question_id": "1",
@@ -166,6 +185,7 @@ async def respond_to_question(
     session_id: str,
     request: SubmitAnswerRequest,
     current_user_id: int = Depends(security_service.get_user_from_token),
+    db: Session = Depends(get_db),
 ):
     """
     Submit voice/text answer to interview question
@@ -196,28 +216,46 @@ async def respond_to_question(
         print(f"[INTERVIEW DEBUG] Submitting answer for session: {session_id}")
         print(f"[INTERVIEW DEBUG] Available sessions: {list(mock_interview_service.sessions.keys())}")
         
-        result = await mock_interview_service.submit_answer(session_id, request.user_answer)
-        
+        result = await mock_interview_service.submit_answer(session_id, request.user_answer, db)
+        feedback = result.get("feedback") or {}
+        raw_score = feedback.get("score_out_of_10", 0) or 0
+
+        # Stable, named per-answer payload. The frontend merges this with the
+        # delivery analysis (pacing / clarity / fillers) from /analyze-delivery.
+        content_feedback = {
+            "content_relevance": round(raw_score * 10),
+            "clarity": feedback.get("communication", ""),
+            "pacing": None,
+            "filler_words": None,
+            "strengths": feedback.get("strengths", []),
+            "improvements": feedback.get("improvements", []),
+            "overall_comment": feedback.get("overall_comment", ""),
+        }
+
         if result.get("interview_complete"):
             # Interview finished - get final report
-            report = mock_interview_service.end_interview(session_id)
+            report = mock_interview_service.end_interview(session_id, db)
             return {
                 "status": "interview_complete",
-                "feedback": result.get("feedback"),
+                "feedback": feedback,
+                "content_feedback": content_feedback,
+                "report": report,
+                "metrics_summary": report.get("metrics_summary"),
                 "overall_score": report.get("overall_score", result.get("score_so_far")),
                 "score_rating": report.get("score_rating", "PASS"),
                 "next_question": None,
-                "questions_answered": len(mock_interview_service.sessions[session_id].answers) if session_id in mock_interview_service.sessions else 5,
+                "questions_answered": report.get("questions_answered", 5),
                 "message": f"Interview complete! Your score: {report.get('overall_score', result.get('score_so_far', 0))}/10"
             }
         else:
             # More questions remaining
-            session = mock_interview_service.sessions.get(session_id)
+            session = mock_interview_service._load_session(session_id, db)
             questions_answered = session.current_question_index if session else 0
             
             return {
                 "status": "answer_recorded",
-                "feedback": result.get("feedback"),
+                "feedback": feedback,
+                "content_feedback": content_feedback,
                 "score_so_far": result.get("score_so_far"),
                 "next_question": result.get("next_question"),
                 "questions_answered": questions_answered,
@@ -232,9 +270,10 @@ async def respond_to_question(
 async def get_current_question(
     session_id: str,
     current_user_id: int = Depends(security_service.get_user_from_token),
+    db: Session = Depends(get_db),
 ):
     """Get the current question in the interview"""
-    question = mock_interview_service.get_current_question(session_id)
+    question = mock_interview_service.get_current_question(session_id, db)
     
     if not question:
         return {
@@ -258,13 +297,14 @@ async def submit_interview_answer(
     session_id: str,
     request: SubmitAnswerRequest,
     current_user_id: int = Depends(security_service.get_user_from_token),
+    db: Session = Depends(get_db),
 ):
     """Legacy endpoint - use /respond instead"""
     if not request.user_answer or len(request.user_answer.strip()) < 5:
         raise HTTPException(status_code=400, detail="Answer too short")
     
     try:
-        result = await mock_interview_service.submit_answer(session_id, request.user_answer)
+        result = await mock_interview_service.submit_answer(session_id, request.user_answer, db)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
@@ -315,7 +355,7 @@ async def end_interview(
 ):
     """End interview and generate comprehensive report"""
     try:
-        report = mock_interview_service.end_interview(session_id)
+        report = mock_interview_service.end_interview(session_id, db)
         
         # Save session report to PostgreSQL
         from datetime import datetime
@@ -344,9 +384,11 @@ async def end_interview(
             "report": {
                 "session_id": report.get("session_id"),  
                 "role": report.get("role"),
+                "industry": report.get("industry"),
                 "duration_minutes": report.get("duration_minutes", 0),
                 "overall_score": report.get("overall_score", 0),
                 "score_rating": report.get("score_rating", "PASS"),
+                "metrics_summary": report.get("metrics_summary"),
                 "strengths": report.get("strengths", []),
                 "improvements": report.get("improvements", []),
                 "detailed_improvements": report.get("detailed_improvements", []),
@@ -370,77 +412,29 @@ class DeliveryMetricsRequest(BaseModel):
 async def analyze_delivery(
     request: DeliveryMetricsRequest,
     current_user_id: int = Depends(security_service.get_user_from_token),
+    db: Session = Depends(get_db),
 ):
     """
     Analyzes HOW the user spoke (delivery), not just WHAT they said.
     Computes: WPM, filler word count, clarity score, pacing rating.
     Called from frontend after each voice answer is transcribed.
     """
-    import re
+    result = analyze_delivery_metrics(request.transcript, request.duration_seconds)
 
-    transcript = request.transcript.strip()
-    duration = max(request.duration_seconds, 1)
-
-    # 1. Word count & WPM
-    words = transcript.split()
-    word_count = len(words)
-    wpm = round((word_count / duration) * 60, 1)
-
-    # 2. Filler word detection
-    FILLER_WORDS = [
-        "um", "uh", "like", "you know", "basically", "literally",
-        "actually", "honestly", "right", "so", "kind of", "sort of",
-        "i mean", "you see", "well", "okay so"
-    ]
-    transcript_lower = transcript.lower()
-    filler_count = 0
-    filler_found = []
-    for filler in FILLER_WORDS:
-        pattern = r'\b' + re.escape(filler) + r'\b'
-        matches = re.findall(pattern, transcript_lower)
-        if matches:
-            filler_count += len(matches)
-            filler_found.append(filler)
-
-    # 3. Pacing rating
-    if wpm < 100:
-        pacing_label = "Too Slow"
-        pacing_score = 50
-    elif wpm <= 150:
-        pacing_label = "Perfect"
-        pacing_score = 100
-    elif wpm <= 180:
-        pacing_label = "Slightly Fast"
-        pacing_score = 75
-    else:
-        pacing_label = "Too Fast"
-        pacing_score = 40
-
-    # 4. Clarity score (penalize filler words)
-    filler_rate = filler_count / max(word_count, 1)
-    clarity_score = max(0, round((1 - filler_rate * 5) * 100))
-
-    # 5. Overall delivery score
-    delivery_score = round((clarity_score * 0.5 + pacing_score * 0.5))
-
-    return {
-        "wpm": wpm,
-        "word_count": word_count,
-        "duration_seconds": duration,
-        "filler_count": filler_count,
-        "filler_words_found": list(set(filler_found)),
-        "pacing_label": pacing_label,
-        "pacing_score": pacing_score,
-        "clarity_score": clarity_score,
-        "delivery_score": delivery_score,
-        "metrics": {
-            "content": None,       # filled by AI answer scoring
-            "clarity": clarity_score,
-            "pacing": pacing_score,
-        },
-        "tips": (
-            f"You used {filler_count} filler word(s)  try pausing instead. " if filler_count > 3 else ""
-        ) + (
-            f"Speaking at {wpm} WPM  aim for 120-150 WPM for clarity. " if pacing_score < 80 else "Great pacing! "
+    # Persist per-answer delivery metrics so the final report can show
+    # averaged, named Clarity / Pacing metrics instead of client guesses.
+    if request.session_id:
+        mock_interview_service.record_delivery(
+            request.session_id,
+            {
+                "wpm": result["wpm"],
+                "word_count": result["word_count"],
+                "filler_count": result["filler_count"],
+                "pacing_score": result["pacing_score"],
+                "clarity_score": result["clarity_score"],
+                "delivery_score": result["delivery_score"],
+            },
+            db,
         )
-    }
+
+    return result

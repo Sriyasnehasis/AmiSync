@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Command, Briefcase, FileText, LayoutDashboard, Mic, Settings } from "lucide-react";
+import { Search, Command, FileText, Mic } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function CommandBar() {
@@ -27,12 +27,10 @@ export function CommandBar() {
     };
   }, []);
 
+  // v1 scope only — see AmiSync_Revised_Plan_v2.md §5
   const actions = [
-    { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-    { label: "AI Resume Builder", icon: FileText, href: "/resume" },
-    { label: "Job Search", icon: Briefcase, href: "/jobs" },
-    { label: "Interview Coach", icon: Mic, href: "/interviews" },
-    { label: "Settings", icon: Settings, href: "/settings" },
+    { label: "Resume Optimizer", icon: FileText, href: "/resume" },
+    { label: "Interview Prep", icon: Mic, href: "/interviews" },
   ];
 
   if (!open) return null;

@@ -15,6 +15,7 @@ import {
 } from "@tabler/icons-react";
 import { SiteLogo } from "@/components/SiteLogo";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { useAuthStore } from "@/hooks/useAuth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -54,27 +55,30 @@ export default function SignupPage() {
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem("token", data.access_token);
+        useAuthStore.getState().setToken(data.access_token);
         
         // Retrieve full user profile
+        let storedUser: any;
         try {
           const userRes = await fetch(`${apiBase}/users/me`, {
             headers: { Authorization: `Bearer ${data.access_token}` },
           });
           if (userRes.ok) {
-            const userData = await userRes.json();
-            localStorage.setItem("user", JSON.stringify(userData));
+            storedUser = await userRes.json();
           } else {
-            localStorage.setItem("user", JSON.stringify({ 
+            storedUser = {
               full_name: formData.full_name,
-              email: formData.email 
-            }));
+              email: formData.email,
+            };
           }
         } catch {
-          localStorage.setItem("user", JSON.stringify({ 
+          storedUser = {
             full_name: formData.full_name,
-            email: formData.email 
-          }));
+            email: formData.email,
+          };
         }
+        localStorage.setItem("user", JSON.stringify(storedUser));
+        useAuthStore.getState().setUser(storedUser);
 
         router.push("/auth/onboarding");
       } else {

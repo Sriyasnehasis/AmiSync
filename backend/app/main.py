@@ -4,6 +4,10 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.db import engine, Base
+# Import the models package so every SQLAlchemy model is registered on Base
+# before create_all() runs (notably InterviewSessionReport, which is otherwise
+# only imported lazily inside endpoint functions).
+import app.models  # noqa: F401
 from app.models.job import JobListing
 from app.models.user import User
 from app.api import jobs, auth, resume, applications, interviews, hr_contacts, users, github, ats, cover_letter
@@ -18,10 +22,10 @@ _db_ready = False
 try:
     Base.metadata.create_all(bind=engine)
     _db_ready = True
-    print("[STARTUP] ✅ Database tables created/verified successfully")
+    print("[STARTUP] OK - Database tables created/verified successfully")
 except Exception as db_err:
-    print(f"[STARTUP] ⚠️  Could not create/verify DB tables: {db_err}")
-    print("[STARTUP] Server will still start — DB may be temporarily unavailable.")
+    print(f"[STARTUP] WARNING - Could not create/verify DB tables: {db_err}")
+    print("[STARTUP] Server will still start - DB may be temporarily unavailable.")
 
 # Reflect schema for diagnostics (non-fatal)
 if _db_ready:

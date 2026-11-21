@@ -2,18 +2,17 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, FileText, Mic, Briefcase, Sparkles, X } from "lucide-react";
+import { Plus, FileText, Mic, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function FloatingActionRing() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
+  // v1 scope only — see AmiSync_Revised_Plan_v2.md §5
   const actions = [
-    { label: "Resume", icon: FileText, href: "/resume", color: "bg-blue-500" },
-    { label: "Interview", icon: Mic, href: "/interviews", color: "bg-green-500" },
-    { label: "Jobs", icon: Briefcase, href: "/jobs", color: "bg-amber-500" },
-    { label: "Analysis", icon: Sparkles, href: "/skill-gap", color: "bg-purple-500" },
+    { label: "Resume Optimizer", icon: FileText, href: "/resume", color: "bg-blue-500" },
+    { label: "Interview Prep", icon: Mic, href: "/interviews", color: "bg-green-500" },
   ];
 
   return (

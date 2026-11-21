@@ -9,9 +9,72 @@ from enum import Enum
 from datetime import datetime, timedelta
 import uuid
 import random
+import re
 from collections import Counter
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+
+FILLER_WORDS = [
+    "um", "uh", "like", "you know", "basically", "literally",
+    "actually", "honestly", "right", "so", "kind of", "sort of",
+    "i mean", "you see", "well", "okay so",
+]
+
+
+def analyze_delivery_metrics(transcript: str, duration_seconds: float) -> Dict:
+    """Pure-Python delivery analysis: WPM, filler words, clarity and pacing.
+
+    Kept separate from the HTTP endpoint so it can be unit tested and reused.
+    """
+    transcript = (transcript or "").strip()
+    duration = max(float(duration_seconds), 1)
+
+    words = transcript.split()
+    word_count = len(words)
+    wpm = round((word_count / duration) * 60, 1)
+
+    transcript_lower = transcript.lower()
+    filler_count = 0
+    filler_found = []
+    for filler in FILLER_WORDS:
+        matches = re.findall(r"\b" + re.escape(filler) + r"\b", transcript_lower)
+        if matches:
+            filler_count += len(matches)
+            filler_found.append(filler)
+
+    if wpm < 100:
+        pacing_label, pacing_score = "Too Slow", 50
+    elif wpm <= 150:
+        pacing_label, pacing_score = "Perfect", 100
+    elif wpm <= 180:
+        pacing_label, pacing_score = "Slightly Fast", 75
+    else:
+        pacing_label, pacing_score = "Too Fast", 40
+
+    filler_rate = filler_count / max(word_count, 1)
+    clarity_score = max(0, round((1 - filler_rate * 5) * 100))
+    delivery_score = round((clarity_score * 0.5 + pacing_score * 0.5))
+
+    return {
+        "wpm": wpm,
+        "word_count": word_count,
+        "duration_seconds": duration,
+        "filler_count": filler_count,
+        "filler_words_found": list(set(filler_found)),
+        "pacing_label": pacing_label,
+        "pacing_score": pacing_score,
+        "clarity_score": clarity_score,
+        "delivery_score": delivery_score,
+        "metrics": {"content": None, "clarity": clarity_score, "pacing": pacing_score},
+        "tips": (
+            f"You used {filler_count} filler word(s) - try pausing instead. "
+            if filler_count > 3 else ""
+        ) + (
+            f"Speaking at {wpm} WPM - aim for 120-150 WPM for clarity. "
+            if pacing_score < 80 else "Great pacing! "
+        ),
+    }
 
 class InterviewRole(str, Enum):
     JUNIOR_DEVELOPER = "Junior Developer"
@@ -52,10 +115,12 @@ class InterviewSession(BaseModel):
     user_id: int
     role: InterviewRole
     started_at: datetime
+    industry: Optional[str] = None
     questions: List[InterviewQuestion] = []
     current_question_index: int = 0
     answers: List[str] = []
     feedback_list: List[Dict] = []
+    delivery_metrics: List[Dict] = []
     overall_score: float = 0.0
     status: str = "active"  # active, completed, paused
     rtc_offer: Optional[Dict] = None
@@ -68,6 +133,70 @@ class MockInterviewService:
     def __init__(self):
         self.sessions: Dict[str, InterviewSession] = {}
         self.questions_bank = self._initialize_questions()
+
+    # ──────────────────────────────────────────────────────────────────
+    # Persistence helpers — the in-memory dict is a cache; PostgreSQL is
+    # the source of truth so sessions survive restarts / dyno recycling.
+    # ──────────────────────────────────────────────────────────────────
+    def _save_session(self, session: InterviewSession, db_session: Session = None) -> None:
+        if db_session is None:
+            return
+        try:
+            from app.models.interview_session_state import InterviewSessionState
+
+            payload = session.model_dump(mode="json")
+            row = (
+                db_session.query(InterviewSessionState)
+                .filter(InterviewSessionState.session_id == session.session_id)
+                .first()
+            )
+            if row:
+                row.state_json = payload
+                row.industry = session.industry
+            else:
+                row = InterviewSessionState(
+                    session_id=session.session_id,
+                    user_id=session.user_id,
+                    industry=session.industry,
+                    state_json=payload,
+                )
+                db_session.add(row)
+            db_session.commit()
+        except Exception as e:
+            db_session.rollback()
+            print(f"[INTERVIEW] Could not persist session state: {e}")
+
+    def _load_session(self, session_id: str, db_session: Session = None) -> Optional[InterviewSession]:
+        cached = self.sessions.get(session_id)
+        if cached:
+            return cached
+        if db_session is None:
+            return None
+        try:
+            from app.models.interview_session_state import InterviewSessionState
+
+            row = (
+                db_session.query(InterviewSessionState)
+                .filter(InterviewSessionState.session_id == session_id)
+                .first()
+            )
+            if not row:
+                return None
+            session = InterviewSession.model_validate(row.state_json)
+            self.sessions[session_id] = session
+            return session
+        except Exception as e:
+            print(f"[INTERVIEW] Could not restore session state: {e}")
+            return None
+
+    def record_delivery(self, session_id: str, metrics: Dict, db_session: Session = None) -> bool:
+        """Attach delivery analysis (WPM / fillers / clarity) to a session."""
+        session = self._load_session(session_id, db_session)
+        if not session:
+            return False
+        session.delivery_metrics.append(metrics)
+        self._save_session(session, db_session)
+        return True
     
     def _initialize_questions(self) -> Dict[str, List[InterviewQuestion]]:
         """Initialize comprehensive question bank"""
@@ -492,8 +621,8 @@ class MockInterviewService:
             ],
         }
     
-    async def start_interview_dynamic(self, user_id: int, role: InterviewRole, db_session: Session) -> Dict:
-        """Start a live interview session with dynamically generated questions tailored to the user's resume and profile."""
+    async def start_interview_dynamic(self, user_id: int, role: InterviewRole, db_session: Session, industry: Optional[str] = None) -> Dict:
+        """Start a live interview session with dynamically generated questions tailored to the user's role, industry and profile."""
         from sqlalchemy.orm import Session
         from app.models.user import User
         from app.services.ai_service import _call_ai, GEMINI_AVAILABLE, GROQ_AVAILABLE, OPENROUTER_AVAILABLE
@@ -512,7 +641,7 @@ class MockInterviewService:
             prompt = f"""You are an elite corporate interviewer. Generate exactly 5 interview questions for a candidate.
 
 TARGET POSITION/ROLE: {role.value}
-INDUSTRY FIELD: {profession}
+INDUSTRY FIELD: {industry or profession}
 YEARS OF EXPERIENCE: {experience_years} years
 """
             if resume_text:
@@ -558,27 +687,38 @@ Instructions:
             except Exception as e:
                 print(f"[AI QUESTION GEN ERROR] Dynamic questions failed: {e}. Falling back to default questions bank.")
                 
-        # 3. Fallback to predefined questions bank if AI failed or returned invalid format
+        # 3. Fallback / top-up to exactly 5 questions. Some role banks are small,
+        # so cycle through them rather than starting a short session.
         if len(selected_questions) < 5:
-            questions = self.questions_bank.get(role, self.questions_bank[InterviewRole.JUNIOR_DEVELOPER])
-            # If bank doesn't have enough, reuse them or sample as many as we can
-            selected_questions = random.sample(questions, min(5, len(questions)))
+            questions = self.questions_bank.get(role) or self.questions_bank[InterviewRole.JUNIOR_DEVELOPER]
+            pool = random.sample(questions, len(questions))
+            while len(selected_questions) < 5:
+                needed = 5 - len(selected_questions)
+                existing = {q.question_text for q in selected_questions}
+                batch = [q for q in pool if q.question_text not in existing][:needed]
+                if not batch:
+                    batch = pool[:needed]
+                selected_questions.extend(batch)
+                random.shuffle(pool)
             
         # 4. Initialize session
         session = InterviewSession(
             session_id=session_id,
             user_id=user_id,
             role=role,
+            industry=industry,
             started_at=datetime.utcnow(),
             questions=selected_questions,
             status="active"
         )
         
         self.sessions[session_id] = session
+        self._save_session(session, db_session)
         
         return {
             "session_id": session_id,
             "role": role.value,
+            "industry": industry or profession,
             "total_questions": len(selected_questions),
             "first_question": selected_questions[0].question_text,
             "message": f"Interview started! Answer {len(selected_questions)} questions dynamically tailored to your background. Voice controls ready."
@@ -588,8 +728,12 @@ Instructions:
         """Start a live interview session with WebRTC support"""
         session_id = str(uuid.uuid4())
         
-        questions = self.questions_bank.get(role, self.questions_bank[InterviewRole.JUNIOR_DEVELOPER])
-        selected_questions = random.sample(questions, min(5, len(questions)))
+        questions = self.questions_bank.get(role) or self.questions_bank[InterviewRole.JUNIOR_DEVELOPER]
+        selected_questions = []
+        pool = random.sample(questions, len(questions))
+        while len(selected_questions) < 5:
+            selected_questions.extend(pool[: 5 - len(selected_questions)])
+            random.shuffle(pool)
         
         session = InterviewSession(
             session_id=session_id,
@@ -610,19 +754,19 @@ Instructions:
             "message": f"Interview started! Answer {len(selected_questions)} questions. Video and audio will be enabled."
         }
     
-    def get_current_question(self, session_id: str) -> Optional[InterviewQuestion]:
+    def get_current_question(self, session_id: str, db_session: Session = None) -> Optional[InterviewQuestion]:
         """Get current question for display"""
-        session = self.sessions.get(session_id)
+        session = self._load_session(session_id, db_session)
         if not session or session.current_question_index >= len(session.questions):
             return None
         return session.questions[session.current_question_index]
-    
-    async def submit_answer(self, session_id: str, answer_audio_text: str) -> Dict:
+
+    async def submit_answer(self, session_id: str, answer_audio_text: str, db_session: Session = None) -> Dict:
         """
         Submit answer (from audio transcription or text)
         Generate real-time feedback for candidate
         """
-        session = self.sessions.get(session_id)
+        session = self._load_session(session_id, db_session)
         if not session:
             # Debug: print available sessions
             print(f"[INTERVIEW ERROR] Session not found!")
@@ -640,9 +784,7 @@ Instructions:
                 "interview_complete": True
             }
         
-        current_question = self.get_current_question(session_id)
-        if not current_question:
-            raise ValueError("No current question")
+        current_question = session.questions[session.current_question_index]
         
         # Store answer
         session.answers.append(answer_audio_text)
@@ -657,6 +799,9 @@ Instructions:
         # Update overall score
         self._update_overall_score(session)
         
+        # Persist the mutation immediately (survives restarts)
+        self._save_session(session, db_session)
+
         # Check if interview is now complete
         if session.current_question_index >= len(session.questions):
             return {
@@ -668,7 +813,7 @@ Instructions:
             }
         
         # Get next question
-        next_question = self.get_current_question(session_id)
+        next_question = session.questions[session.current_question_index]
         
         return {
             "feedback": feedback,
@@ -837,24 +982,44 @@ Instructions:
             "message": f"Screen share {'enabled' if enabled else 'disabled'}"
         }
     
-    def end_interview(self, session_id: str) -> Dict:
+    def end_interview(self, session_id: str, db_session: Session = None) -> Dict:
         """End interview and generate comprehensive report"""
-        session = self.sessions.get(session_id)
+        session = self._load_session(session_id, db_session)
         if not session:
             raise ValueError("Session not found")
         
         session.status = "completed"
+        self._save_session(session, db_session)
         
         duration = (datetime.utcnow() - session.started_at).total_seconds() / 60
+
+        # Named, actionable metrics — Content Relevance / Clarity / Pacing
+        content_scores = [
+            (f.get("score_out_of_10") or 0) * 10 for f in session.feedback_list
+        ]
+        delivery = session.delivery_metrics or []
+        content_relevance = round(sum(content_scores) / len(content_scores)) if content_scores else 0
+        clarity = round(sum(d.get("clarity_score", 0) for d in delivery) / len(delivery)) if delivery else 0
+        pacing = round(sum(d.get("pacing_score", 0) for d in delivery) / len(delivery)) if delivery else 0
+        wpm = round(sum(d.get("wpm", 0) for d in delivery) / len(delivery), 1) if delivery else 0
+        filler_total = sum(d.get("filler_count", 0) for d in delivery)
         
         return {
             "session_id": session_id,
             "role": session.role.value,
+            "industry": session.industry,
             "duration_minutes": int(duration),
             "questions_answered": len(session.answers),
             "total_questions": len(session.questions),
             "overall_score": round(session.overall_score, 1),
             "score_rating": self._rate_score(session.overall_score),
+            "metrics_summary": {
+                "content_relevance": content_relevance,
+                "clarity": clarity,
+                "pacing": pacing,
+                "average_wpm": wpm,
+                "filler_words_total": filler_total,
+            },
             "feedback_breakdown": session.feedback_list,
             "strengths": self._get_top_strengths(session),
             "improvements": self._get_improvements(session),
